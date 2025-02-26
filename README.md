@@ -1,6 +1,6 @@
 # MATLAB MCP Server
 
-A powerful MCP server that integrates MATLAB with Claude AI, allowing you to execute MATLAB code, generate MATLAB scripts from natural language descriptions, and access MATLAB documentation directly through your AI assistant.
+A powerful MCP server that integrates MATLAB with  AI, allowing you to execute MATLAB code, generate MATLAB scripts from natural language descriptions, and access MATLAB documentation directly through your AI assistant.
 
 ## Features
 
@@ -58,9 +58,9 @@ npm install
 npm run build
 ```
 
-### 2. Configure Claude to use the server
+### 2. Configure cline to use the server
 
-To use with Claude Desktop, add the server config:
+To use with cline , add the server config:
 
 On MacOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
 On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
