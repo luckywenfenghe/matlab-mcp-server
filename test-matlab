@@ -1,0 +1,147 @@
+// test-matlab.js
+import { promisify } from "util";
+import { exec } from "child_process";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
+
+
+
+// 配置 - 将路径修改为您的 MATLAB 安装路径
+const execAsync = promisify(exec);
+const matlabPath = process.env.MATLAB_PATH || "C:\\Program Files\\MATLAB\\R2024a\\bin\\matlab.exe";
+process.stderr.write(`[DEBUG] MATLAB executable path: ${matlabPath}\n`);
+process.stderr.write(`[DEBUG] Environment MATLAB_PATH: ${process.env.MATLAB_PATH || "未设置"}\n`);
+
+// Default configuration
+const config = {
+    executablePath: matlabPath,
+    tempDir: path.join(os.tmpdir(), "matlab-mcp")
+};
+
+// 确保临时目录存在
+if (!fs.existsSync(config.tempDir)) {
+    fs.mkdirSync(config.tempDir, { recursive: true });
+}
+
+/**
+ * 执行 MATLAB 代码
+ */
+async function executeCode(code, saveScript = false, scriptPath) {
+    try {
+        // 创建临时 .m 文件
+        const tempFile = path.join(config.tempDir, `script_${Date.now()}.m`);
+        
+        // 处理特殊字符
+        const asciiCode = code
+            .replace(/[']/g, "'")
+            .replace(/["]/g, '"')
+            .replace(/[—]/g, '--')
+            .replace(/[–]/g, '-')
+            .replace(/[…]/g, '...');
+        
+        fs.writeFileSync(tempFile, asciiCode);
+        
+        // 如果需要保存脚本
+        let savedScriptPath;
+        if (saveScript) {
+            const targetPath = scriptPath || path.join(process.cwd(), `matlab_script_${Date.now()}.m`);
+            fs.copyFileSync(tempFile, targetPath);
+            savedScriptPath = targetPath;
+        }
+        
+        // 执行 MATLAB 命令
+        console.log(`Executing MATLAB script: ${tempFile}`);
+        const command = `"${config.executablePath}" -batch "run('${tempFile.replace(/\\/g, '/')}'); pause(1);"`;
+        console.log(`Command: ${command}`);
+        
+        const { stdout, stderr } = await execAsync(command);
+        
+        // 清理临时文件
+        if (!saveScript) {
+            fs.unlinkSync(tempFile);
+        }
+        
+        return {
+            output: stdout,
+            error: stderr || undefined,
+            scriptPath: savedScriptPath
+        };
+    } catch (error) {
+        console.error("Error executing MATLAB code:", error);
+        return {
+            output: "",
+            error: error instanceof Error ? error.message : String(error)
+        };
+    }
+}
+
+/**
+ * 检查 MATLAB 是否可用
+ */
+async function checkMatlabAvailability() {
+    try {
+        console.log("Checking MATLAB availability...");
+        const command = `"${config.executablePath}" -nosplash -nodesktop -r "disp('MATLAB is available'); exit;"`;
+        const { stdout } = await execAsync(command);
+        console.log("MATLAB availability check result:", stdout);
+        return true;
+    } catch (error) {
+        console.error("MATLAB is not available:", error);
+        return false;
+    }
+}
+
+/**
+ * 运行测试
+ */
+async function runTest() {
+    // 首先检查 MATLAB 是否可用
+    const isAvailable = await checkMatlabAvailability();
+    if (!isAvailable) {
+        console.error("MATLAB is not available. Please check the path and installation.");
+        return;
+    }
+    
+    console.log("MATLAB is available. Running test code...");
+    
+    // 测试代码 - 简单的 MATLAB 命令
+    const testCode = `
+    % 显示消息
+    disp('Hello from MATLAB!');
+    
+    % 创建简单数组并显示
+    x = 1:10;
+    y = x.^2;
+    disp(['Sum of x: ' num2str(sum(x))]);
+    disp(['Mean of y: ' num2str(mean(y))]);
+    
+    % 创建简单图形
+    figure;
+    plot(x, y, 'r-o');
+    title('Plot of x vs y = x^2');
+    xlabel('x');
+    ylabel('y');
+    grid on;
+    
+    % 返回成功消息
+    disp('Test completed successfully');
+    `;
+    
+    // 执行测试代码并保存脚本
+    const result = await executeCode(testCode, true);
+    
+    console.log("\n--- MATLAB Execution Results ---");
+    if (result.error) {
+        console.error("Error:", result.error);
+    } else {
+        console.log("Output:", result.output);
+    }
+    
+    if (result.scriptPath) {
+        console.log("Script saved to:", result.scriptPath);
+    }
+}
+
+// 运行测试
+runTest().catch(console.error);
